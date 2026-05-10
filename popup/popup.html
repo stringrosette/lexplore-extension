@@ -21,22 +21,20 @@
       <p class="error-msg"></p>
     </div>
 
-    <div id="state-languages" class="state hidden">
+    <div id="state-main" class="state hidden">
       <label for="lang-select">Transcript language</label>
-      <select id="lang-select"></select>
-      <button id="load-btn">Load transcript</button>
-    </div>
+      <div class="row">
+        <select id="lang-select"></select>
+        <button id="load-btn">Load</button>
+      </div>
 
-    <div id="state-fetching" class="state hidden">
-      <p class="muted">Loading transcript…</p>
-    </div>
-
-    <div id="state-ready" class="state hidden">
-      <label for="title-input">Title</label>
-      <input type="text" id="title-input" />
-      <label for="preview">Transcript preview</label>
-      <textarea id="preview" readonly rows="6"></textarea>
-      <button id="send-btn">Send to Lexplore</button>
+      <div id="transcript-section" class="hidden">
+        <label for="title-input">Title</label>
+        <input type="text" id="title-input" />
+        <label for="preview">Transcript preview</label>
+        <textarea id="preview" readonly rows="6"></textarea>
+        <button id="send-btn">Send to Lexplore</button>
+      </div>
     </div>
 
     <div id="state-success" class="state hidden">

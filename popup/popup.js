@@ -3,7 +3,7 @@
 
 const $ = id => document.getElementById(id);
 
-const STATES = ['loading', 'error', 'languages', 'fetching', 'ready', 'success'];
+const STATES = ['loading', 'error', 'main', 'success'];
 function showState(name) {
   STATES.forEach(s => $(`state-${s}`).classList.toggle('hidden', s !== name));
 }
@@ -123,42 +123,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (track.languageCode === 'en') option.selected = true;
     select.appendChild(option);
   });
-  showState('languages');
+  showState('main');
 
-  // Step 2: load transcript for selected language
-  $('load-btn').addEventListener('click', async () => {
-    showState('fetching');
+  let currentTranscript = null;
 
-    let transcript;
+  // Step 2: load transcript for selected language (re-runnable on language change)
+  async function loadTranscript() {
+    const btn = $('load-btn');
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    $('transcript-section').classList.add('hidden');
+
     try {
-      transcript = await fetchTranscript(select.value);
+      currentTranscript = await fetchTranscript(select.value);
     } catch (err) {
       showError(err.message);
       return;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Load';
     }
 
     $('title-input').value = title;
-    $('preview').value = transcript.slice(0, 400) + (transcript.length > 400 ? '…' : '');
-    showState('ready');
+    $('preview').value =
+      currentTranscript.slice(0, 400) + (currentTranscript.length > 400 ? '…' : '');
+    $('transcript-section').classList.remove('hidden');
+  }
 
-    // Step 3: send to Lexplore
-    $('send-btn').addEventListener('click', async () => {
-      const btn = $('send-btn');
-      btn.disabled = true;
-      btn.textContent = 'Sending…';
+  $('load-btn').addEventListener('click', loadTranscript);
 
-      try {
-        await sendToLexplore({
-          title: $('title-input').value.trim(),
-          content: transcript,
-          sourceUrl: url,
-        });
-        showState('success');
-      } catch (err) {
-        showError(err.message);
-        btn.disabled = false;
-        btn.textContent = 'Send to Lexplore';
-      }
-    });
+  // Step 3: send to Lexplore
+  $('send-btn').addEventListener('click', async () => {
+    const btn = $('send-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    try {
+      await sendToLexplore({
+        title: $('title-input').value.trim(),
+        content: currentTranscript,
+        sourceUrl: url,
+      });
+      showState('success');
+    } catch (err) {
+      showError(err.message);
+      btn.disabled = false;
+      btn.textContent = 'Send to Lexplore';
+    }
   });
 });

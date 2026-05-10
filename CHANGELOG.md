@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-10
+
+### Added
+- Channel name and active caption language badge displayed in popup
+
+### Changed
+- Transcript extraction now reads from YouTube's DOM transcript panel (`ytd-transcript-segment-renderer`) instead of fetching the timedtext HTTP API — eliminates all cookie/origin/format issues
+- Active caption language auto-detected from `player.getOption('captions', 'track')` — no dropdown needed, user controls language in YouTube UI
+- Language dropdown removed from popup; popup now shows video metadata (title, channel, language) then a single Load button
+
+### Removed
+- `getLanguages()`, `fetchTranscript()`, `parseTranscriptJson3()`, `parseTranscriptXml()` functions removed
+
 ## [0.2.0] - 2026-05-10
 
 ### Added

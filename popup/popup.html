@@ -14,7 +14,7 @@
 
   <main>
     <div id="state-loading" class="state">
-      <p class="muted">Detecting available transcripts…</p>
+      <p class="muted">Detecting video metadata…</p>
     </div>
 
     <div id="state-error" class="state hidden">
@@ -22,15 +22,19 @@
     </div>
 
     <div id="state-main" class="state hidden">
-      <label for="lang-select">Transcript language</label>
-      <div class="row">
-        <select id="lang-select"></select>
-        <button id="load-btn">Load</button>
+      <label for="title-input">Title</label>
+      <input type="text" id="title-input" />
+
+      <div class="meta-row">
+        <span class="meta-label">Channel</span>
+        <span id="author-display" class="meta-value"></span>
+        <span class="meta-label">Language</span>
+        <span id="lang-display" class="lang-badge"></span>
       </div>
 
+      <button id="load-btn">Load transcript</button>
+
       <div id="transcript-section" class="hidden">
-        <label for="title-input">Title</label>
-        <input type="text" id="title-input" />
         <label for="preview">Transcript preview</label>
         <textarea id="preview" readonly rows="6"></textarea>
         <button id="send-btn">Send to Lexplore</button>

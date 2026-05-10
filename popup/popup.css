@@ -109,34 +109,41 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.row {
+.meta-row {
   display: flex;
+  align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
-.row select {
+.meta-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.meta-value {
+  font-size: 12px;
+  color: #444;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.row button {
-  margin-top: 0;
-  flex-shrink: 0;
-}
-
-select {
-  width: 100%;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 13px;
-  font-family: inherit;
-  background: #fff;
-  color: #1a1a1a;
-}
-
-select:focus {
-  outline: none;
-  border-color: #6366f1;
+.lang-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4f46e5;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 #transcript-section {

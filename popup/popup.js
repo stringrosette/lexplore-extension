@@ -94,18 +94,29 @@ async function fetchTranscriptFromUrl(tabId, url) {
   return parseTranscript(result.text);
 }
 
+function formatSegments(segments) {
+  return segments
+    .map(({ startMs, text }) => {
+      const totalSecs = Math.floor(startMs / 1000);
+      const mins = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
+      return `[${mins}:${secs.toString().padStart(2, '0')}] ${text}`;
+    })
+    .join('\n');
+}
+
 function parseTranscript(text) {
   try {
     const data = JSON.parse(text);
-    const lines = [];
+    const segments = [];
     for (const event of data.events || []) {
       if (!event.segs) continue;
       const line = event.segs.map(s => s.utf8 || '').join('').replace(/\n/g, ' ').trim();
-      if (line) lines.push(line);
+      if (line) segments.push({ startMs: event.tStartMs || 0, text: line });
     }
-    if (lines.length) {
-      console.log('[lexplore] parsed as JSON3, segments:', lines.length);
-      return lines.join(' ');
+    if (segments.length) {
+      console.log('[lexplore] parsed as JSON3, segments:', segments.length);
+      return formatSegments(segments);
     }
   } catch {}
   console.log('[lexplore] falling back to XML parser');
@@ -113,24 +124,25 @@ function parseTranscript(text) {
 }
 
 function parseTranscriptXml(xml) {
-  const texts = [];
-  const re = /<text[^>]*>([\s\S]*?)<\/text>/g;
+  const segments = [];
+  const re = /<text[^>]*\bstart="([^"]*)"[^>]*>([\s\S]*?)<\/text>/g;
   let match;
   while ((match = re.exec(xml)) !== null) {
-    const decoded = match[1]
+    const startMs = Math.round(parseFloat(match[1]) * 1000);
+    const decoded = match[2]
       .replace(/&amp;/g, '&')
       .replace(/&#39;/g, "'")
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .trim();
-    if (decoded) texts.push(decoded);
+    if (decoded) segments.push({ startMs, text: decoded });
   }
-  console.log('[lexplore] XML parsed, segments:', texts.length);
-  return texts.join(' ');
+  console.log('[lexplore] XML parsed, segments:', segments.length);
+  return formatSegments(segments);
 }
 
-async function sendToLexplore({ title, content, sourceUrl }) {
+async function sendToLexplore({ title, content, url, language }) {
   const { apiUrl, token } = await chrome.storage.local.get({
     apiUrl: 'http://localhost:8000',
     token: '',
@@ -142,7 +154,7 @@ async function sendToLexplore({ title, content, sourceUrl }) {
   const res = await fetch(`${apiUrl}/api/v1/texts`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ title, content, source_url: sourceUrl }),
+    body: JSON.stringify({ title, content, url, language, text_type: 'script' }),
   });
 
   if (!res.ok) {
@@ -210,8 +222,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     btn.disabled = false;
     btn.textContent = 'Load transcript';
-    $('preview').value =
-      currentTranscript.slice(0, 400) + (currentTranscript.length > 400 ? '…' : '');
+    const lines = currentTranscript.split('\n');
+    $('preview').value = lines.slice(0, 8).join('\n') + (lines.length > 8 ? '\n…' : '');
     $('transcript-section').classList.remove('hidden');
   }
 
@@ -226,7 +238,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       await sendToLexplore({
         title: $('title-input').value.trim(),
         content: currentTranscript,
-        sourceUrl: url,
+        url,
+        language,
       });
       showState('success');
     } catch (err) {

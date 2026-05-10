@@ -2,4 +2,4 @@
 
 ## No active tasks
 
-Initial project scaffold created on main and develop branches.
+DOM-based transcript extraction (v0.3.0) shipped on develop.

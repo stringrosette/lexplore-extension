@@ -47,10 +47,21 @@ async function getLanguages(tabId) {
 }
 
 async function fetchTranscript(baseUrl) {
-  const res = await fetch(baseUrl);
+  console.log('[lexplore] fetchTranscript url:', baseUrl);
+  let res;
+  try {
+    res = await fetch(baseUrl);
+  } catch (err) {
+    console.error('[lexplore] fetch network error:', err);
+    throw new Error(`Network error fetching transcript: ${err.message}`);
+  }
+  console.log('[lexplore] fetch response status:', res.status, res.statusText);
   if (!res.ok) throw new Error(`Failed to fetch transcript (${res.status})`);
   const xml = await res.text();
-  return parseTranscriptXml(xml);
+  console.log('[lexplore] xml length:', xml.length, '| first 200 chars:', xml.slice(0, 200));
+  const transcript = parseTranscriptXml(xml);
+  console.log('[lexplore] parsed transcript length:', transcript.length, '| first 200 chars:', transcript.slice(0, 200));
+  return transcript;
 }
 
 function parseTranscriptXml(xml) {
@@ -110,9 +121,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     langData = await getLanguages(tab.id);
   } catch (err) {
+    console.error('[lexplore] getLanguages error:', err);
     showError(err.message);
     return;
   }
+  console.log('[lexplore] langData:', langData);
 
   const { title, url, tracks } = langData;
   const select = $('lang-select');

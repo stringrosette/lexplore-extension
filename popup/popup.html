@@ -14,20 +14,28 @@
 
   <main>
     <div id="state-loading" class="state">
-      <p>Extracting transcript…</p>
+      <p class="muted">Detecting available transcripts…</p>
     </div>
 
     <div id="state-error" class="state hidden">
       <p class="error-msg"></p>
     </div>
 
+    <div id="state-languages" class="state hidden">
+      <label for="lang-select">Transcript language</label>
+      <select id="lang-select"></select>
+      <button id="load-btn">Load transcript</button>
+    </div>
+
+    <div id="state-fetching" class="state hidden">
+      <p class="muted">Loading transcript…</p>
+    </div>
+
     <div id="state-ready" class="state hidden">
       <label for="title-input">Title</label>
       <input type="text" id="title-input" />
-
       <label for="preview">Transcript preview</label>
       <textarea id="preview" readonly rows="6"></textarea>
-
       <button id="send-btn">Send to Lexplore</button>
     </div>
 

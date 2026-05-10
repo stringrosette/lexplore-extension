@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Language selection step in popup: lists all available transcript languages before loading
+
+### Changed
+- Transcript extraction now uses `chrome.scripting.executeScript` (world: MAIN) to read `ytInitialPlayerResponse` directly — replaces fragile regex fetch of page HTML
+- XML parsing moved to service worker using regex (DOMParser unavailable there)
+- Content script removed; all extraction handled by background service worker
+
 ## [0.1.0] - 2026-05-10
 
 ### Added

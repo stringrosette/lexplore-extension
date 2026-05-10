@@ -1,8 +1,8 @@
 const $ = id => document.getElementById(id);
 
-const states = ['loading', 'error', 'ready', 'success'];
+const STATES = ['loading', 'error', 'languages', 'fetching', 'ready', 'success'];
 function showState(name) {
-  states.forEach(s => $(`state-${s}`).classList.toggle('hidden', s !== name));
+  STATES.forEach(s => $(`state-${s}`).classList.toggle('hidden', s !== name));
 }
 
 function showError(msg) {
@@ -16,51 +16,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.runtime.openOptionsPage();
   });
 
-  // Get the active YouTube tab and request transcript
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.url?.includes('youtube.com/watch')) {
     showError('Open a YouTube video page to use Lexplore.');
     return;
   }
 
-  let data;
-  try {
-    data = await chrome.tabs.sendMessage(tab.id, { type: 'GET_TRANSCRIPT' });
-  } catch {
-    showError('Could not connect to the page. Try refreshing the YouTube tab.');
-    return;
-  }
+  // Step 1: detect available transcript languages
+  const langResult = await chrome.runtime.sendMessage({
+    type: 'GET_LANGUAGES',
+    tabId: tab.id,
+  });
 
-  if (data?.error) {
-    showError(data.error);
-    return;
-  }
+  if (langResult?.error) { showError(langResult.error); return; }
 
-  $('title-input').value = data.title;
-  $('preview').value = data.transcript.slice(0, 300) + (data.transcript.length > 300 ? '…' : '');
-  showState('ready');
+  const { title, url, tracks } = langResult;
+  const select = $('lang-select');
 
-  $('send-btn').addEventListener('click', async () => {
-    const btn = $('send-btn');
-    btn.disabled = true;
-    btn.textContent = 'Sending…';
+  tracks.forEach(track => {
+    const option = document.createElement('option');
+    option.value = track.baseUrl;
+    option.textContent = track.languageName;
+    if (track.languageCode === 'en') option.selected = true;
+    select.appendChild(option);
+  });
 
-    const result = await chrome.runtime.sendMessage({
-      type: 'SEND_TEXT',
-      payload: {
-        title: $('title-input').value.trim(),
-        content: data.transcript,
-        sourceUrl: data.url,
-      },
+  showState('languages');
+
+  // Step 2: load transcript for selected language
+  $('load-btn').addEventListener('click', async () => {
+    showState('fetching');
+
+    const transcriptResult = await chrome.runtime.sendMessage({
+      type: 'GET_TRANSCRIPT',
+      baseUrl: select.value,
     });
 
-    if (result?.error) {
-      showError(result.error);
-      btn.disabled = false;
-      btn.textContent = 'Send to Lexplore';
-      return;
-    }
+    if (transcriptResult?.error) { showError(transcriptResult.error); return; }
 
-    showState('success');
+    const { transcript } = transcriptResult;
+    $('title-input').value = title;
+    $('preview').value = transcript.slice(0, 400) + (transcript.length > 400 ? '…' : '');
+    showState('ready');
+
+    // Step 3: send to Lexplore
+    $('send-btn').addEventListener('click', async () => {
+      const btn = $('send-btn');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      const sent = await chrome.runtime.sendMessage({
+        type: 'SEND_TEXT',
+        payload: {
+          title: $('title-input').value.trim(),
+          content: transcript,
+          sourceUrl: url,
+        },
+      });
+
+      if (sent?.error) {
+        showError(sent.error);
+        btn.disabled = false;
+        btn.textContent = 'Send to Lexplore';
+        return;
+      }
+
+      showState('success');
+    });
   });
 });

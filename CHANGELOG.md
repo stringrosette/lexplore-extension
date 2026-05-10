@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-10
+
+### Added
+- Inline login state in popup: person icon in header opens a sign-in form (email + password) using the same `POST /api/v1/auth/login` endpoint as lexplore-app
+- Account button turns indigo when logged in; shows signed-in email and Sign out button on repeat clicks
+- Token and email stored automatically in `chrome.storage.local` on successful login
+
+### Removed
+- Settings gear icon removed from popup header (settings remain accessible via the extension options page)
+
 ## [0.5.0] - 2026-05-10
 
 ### Added

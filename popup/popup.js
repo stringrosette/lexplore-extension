@@ -3,7 +3,7 @@
 
 const $ = id => document.getElementById(id);
 
-const STATES = ['loading', 'error', 'main', 'success'];
+const STATES = ['loading', 'error', 'main', 'success', 'login'];
 function showState(name) {
   STATES.forEach(s => $(`state-${s}`).classList.toggle('hidden', s !== name));
 }
@@ -165,12 +165,81 @@ async function sendToLexplore({ title, content, url, language }) {
   return res.json();
 }
 
+async function showLoginState() {
+  const { token, userEmail } = await chrome.storage.local.get({ token: '', userEmail: '' });
+  if (token) {
+    $('login-form').classList.add('hidden');
+    $('login-status').classList.remove('hidden');
+    $('login-email-display').textContent = userEmail || 'Signed in';
+  } else {
+    $('login-form').classList.remove('hidden');
+    $('login-status').classList.add('hidden');
+    $('login-error').classList.add('hidden');
+    $('email-input').value = '';
+    $('password-input').value = '';
+  }
+  showState('login');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   $('version').textContent = `v${chrome.runtime.getManifest().version}`;
 
-  $('settings-link').addEventListener('click', e => {
-    e.preventDefault();
-    chrome.runtime.openOptionsPage();
+  // Reflect auth state in the account button on load
+  const { token: initialToken } = await chrome.storage.local.get({ token: '' });
+  if (initialToken) $('account-btn').classList.add('logged-in');
+
+  // Account button toggles login state
+  $('account-btn').addEventListener('click', async () => {
+    const onLogin = !$('state-login').classList.contains('hidden');
+    if (onLogin) {
+      showState('main');
+    } else {
+      await showLoginState();
+    }
+  });
+
+  // Login form submit
+  $('login-submit-btn').addEventListener('click', async () => {
+    const btn = $('login-submit-btn');
+    const email = $('email-input').value.trim();
+    const password = $('password-input').value;
+    const errorEl = $('login-error');
+
+    errorEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    try {
+      const { apiUrl } = await chrome.storage.local.get({ apiUrl: 'http://localhost:8000' });
+      const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: email, password }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+      await chrome.storage.local.set({ token: data.access_token, userEmail: email });
+      $('account-btn').classList.add('logged-in');
+      showState('main');
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+  });
+
+  // Sign out
+  $('logout-btn').addEventListener('click', async () => {
+    await chrome.storage.local.set({ token: '', userEmail: '' });
+    $('account-btn').classList.remove('logged-in');
+    showState('main');
   });
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

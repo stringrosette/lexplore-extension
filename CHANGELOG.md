@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Overflow button selector narrowed to video info area only — previous broad selector could trigger like/dislike buttons
+- Added detailed `[lexplore]` console logging inside DOM extraction: segment counts, panel visibility, each candidate selector result, dropdown items, poll attempts
+
 ## [0.3.0] - 2026-05-10
 
 ### Added

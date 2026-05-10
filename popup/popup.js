@@ -68,51 +68,95 @@ async function loadTranscriptFromDOM(tabId) {
       target: { tabId },
       world: 'MAIN',
       func: async () => {
+        const log = (...args) => console.log('[lexplore]', ...args);
+
         const PANEL_SELECTOR =
           'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
         const SEGMENT_SELECTOR = 'ytd-transcript-segment-renderer';
 
-        // Click "Show transcript" button if panel isn't open yet.
-        const isVisible = el => {
-          if (!el) return false;
-          const s = el.getAttribute('visibility');
-          return s === 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED';
-        };
+        // 1. Check if transcript segments are already rendered
+        let segments = Array.from(document.querySelectorAll(SEGMENT_SELECTOR));
+        log('initial segment count:', segments.length);
 
-        let panel = document.querySelector(PANEL_SELECTOR);
-        if (!isVisible(panel)) {
-          // Find the "..." menu button on the video and open it
-          const moreBtn = document.querySelector(
-            'ytd-menu-renderer yt-icon-button[aria-label], ' +
-            'ytd-video-primary-info-renderer ytd-menu-renderer button'
-          );
-          if (moreBtn) {
-            moreBtn.click();
-            await new Promise(r => setTimeout(r, 400));
+        if (!segments.length) {
+          const panel = document.querySelector(PANEL_SELECTOR);
+          log('panel found:', !!panel, '| visibility:', panel?.getAttribute('visibility'));
 
-            // Click "Show transcript" in the overflow menu
-            const items = document.querySelectorAll('ytd-menu-service-item-renderer, yt-formatted-string');
-            for (const item of items) {
-              if (item.textContent.trim().toLowerCase().includes('transcript')) {
-                item.click();
-                break;
-              }
-            }
-            await new Promise(r => setTimeout(r, 800));
+          // 2. Find the overflow "⋮" button in the video info area.
+          //    Selectors tried in priority order — YouTube layout varies by experiment.
+          //    We never use a broad selector that could match like/dislike buttons.
+          const overflowSelectors = [
+            'ytd-video-primary-info-renderer ytd-menu-renderer yt-icon-button button',
+            'ytd-watch-metadata ytd-menu-renderer yt-icon-button button',
+            '#above-the-fold ytd-menu-renderer yt-icon-button button',
+          ];
+
+          let overflowBtn = null;
+          for (const sel of overflowSelectors) {
+            const el = document.querySelector(sel);
+            log(`selector "${sel}":`, !!el);
+            if (el) { overflowBtn = el; break; }
           }
-          panel = document.querySelector(PANEL_SELECTOR);
+
+          if (!overflowBtn) {
+            log('overflow button not found');
+            return {
+              _error:
+                'Could not find the More Actions (⋮) button. ' +
+                'Open the transcript panel in YouTube manually (⋮ → Show transcript), then click Load again.',
+            };
+          }
+
+          log('clicking overflow button');
+          overflowBtn.click();
+          await new Promise(r => setTimeout(r, 500));
+
+          // 3. Find "Show transcript" in the dropdown
+          const menuItems = document.querySelectorAll(
+            'ytd-menu-popup-renderer ytd-menu-service-item-renderer, ' +
+            'tp-yt-iron-dropdown ytd-menu-service-item-renderer'
+          );
+          log('dropdown items found:', menuItems.length);
+
+          let transcriptItem = null;
+          for (const item of menuItems) {
+            const text = item.textContent.trim();
+            log('  menu item:', JSON.stringify(text));
+            if (text.toLowerCase().includes('transcript')) {
+              transcriptItem = item;
+              break;
+            }
+          }
+
+          if (!transcriptItem) {
+            log('transcript option not in menu — closing dropdown');
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            return {
+              _error:
+                'Show transcript option not found in the menu. ' +
+                'Make sure captions are available for this video.',
+            };
+          }
+
+          log('clicking transcript menu item');
+          transcriptItem.click();
+          await new Promise(r => setTimeout(r, 1000));
         }
 
-        // Wait up to 3 s for segments to render
-        let segments = [];
-        for (let i = 0; i < 15; i++) {
+        // 4. Poll for segments (up to 4 s)
+        for (let i = 0; i < 20; i++) {
           segments = Array.from(document.querySelectorAll(SEGMENT_SELECTOR));
-          if (segments.length > 0) break;
+          log(`poll ${i + 1}: segments =`, segments.length);
+          if (segments.length) break;
           await new Promise(r => setTimeout(r, 200));
         }
 
         if (!segments.length) {
-          return { _error: 'No transcript segments found. Enable captions on the video first.' };
+          return {
+            _error:
+              'Transcript panel opened but no segments rendered. ' +
+              'Try scrolling the panel or refreshing the page.',
+          };
         }
 
         const text = segments
@@ -123,6 +167,7 @@ async function loadTranscriptFromDOM(tabId) {
           .filter(Boolean)
           .join(' ');
 
+        log('transcript chars:', text.length, '| preview:', text.slice(0, 80));
         return { text };
       },
     });
@@ -131,6 +176,7 @@ async function loadTranscriptFromDOM(tabId) {
   }
 
   const result = results?.[0]?.result;
+  console.log('[lexplore] DOM result:', result?._error ?? `${result?.text?.length} chars`);
   if (!result) throw new Error('No result from transcript DOM read.');
   if (result._error) throw new Error(result._error);
   return result.text;

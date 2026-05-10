@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-10
+
 ### Added
 - Language selection step in popup: lists all available transcript languages before loading
 
 ### Changed
 - Transcript extraction now uses `chrome.scripting.executeScript` (world: MAIN) to read `ytInitialPlayerResponse` directly — replaces fragile regex fetch of page HTML
-- XML parsing moved to service worker using regex (DOMParser unavailable there)
-- Content script removed; all extraction handled by background service worker
+- All logic (extraction, transcript fetch, API call) runs directly in popup page, bypassing service worker message passing which caused undefined responses due to MV3 sleep/wake race condition
+- Settings page accesses `chrome.storage.local` directly (no service worker relay)
+- XML parsing uses regex (DOMParser unavailable in service workers)
+- Content script removed
 
 ## [0.1.0] - 2026-05-10
 

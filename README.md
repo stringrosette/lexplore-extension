@@ -1,16 +1,16 @@
 # Lexplore Extension
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Last Updated:** 2026-05-10
 
 Browser extension (Manifest V3) that extracts YouTube transcripts and sends them to the Lexplore API as texts.
 
 ## How it works
 
-1. Open a YouTube video with captions
-2. Click the Lexplore toolbar icon
-3. Preview the transcript and confirm the title
-4. Click **Send to Lexplore** — the transcript is POSTed directly to the backend
+1. Open a YouTube video and enable captions in your preferred language
+2. Click the Lexplore toolbar icon — the popup detects the video title, channel, and active caption language automatically
+3. Click **Load transcript** — text is read directly from YouTube's transcript panel (no HTTP requests)
+4. Confirm the title and click **Send to Lexplore** — the transcript is POSTed directly to the backend
 
 ## Installation (development)
 

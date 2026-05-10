@@ -13,7 +13,8 @@ function showError(msg) {
   showState('error');
 }
 
-async function getLanguages(tabId) {
+// Reads video metadata and the currently active caption language from the YouTube player.
+async function getPageData(tabId) {
   let results;
   try {
     results = await chrome.scripting.executeScript({
@@ -22,17 +23,30 @@ async function getLanguages(tabId) {
       func: () => {
         const response = window.ytInitialPlayerResponse;
         if (!response) return { _error: 'No player data found — try refreshing the YouTube tab.' };
-        const tracks =
-          response?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-        return {
-          title: document.title.replace(' - YouTube', '').trim(),
-          url: window.location.href,
-          tracks: tracks.map(t => ({
-            languageCode: t.languageCode,
-            languageName: t.name?.simpleText || t.languageCode,
-            baseUrl: t.baseUrl,
-          })),
-        };
+
+        const details = response.videoDetails || {};
+        const title = details.title || document.title.replace(' - YouTube', '').trim();
+        const author = details.author || '';
+        const videoId = details.videoId || '';
+        const url = window.location.href;
+
+        let language = null;
+        try {
+          const player = document.querySelector('#movie_player');
+          if (player && typeof player.getOption === 'function') {
+            const track = player.getOption('captions', 'track');
+            language = track?.languageCode || null;
+          }
+        } catch (_) {}
+
+        // Fall back to first available caption track language
+        if (!language) {
+          const tracks =
+            response?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+          if (tracks.length) language = tracks[0].languageCode;
+        }
+
+        return { title, author, videoId, url, language };
       },
     });
   } catch (err) {
@@ -42,88 +56,84 @@ async function getLanguages(tabId) {
   const result = results?.[0]?.result;
   if (!result) throw new Error('Could not read page data. Try refreshing the YouTube tab.');
   if (result._error) throw new Error(result._error);
-  if (!result.tracks.length) throw new Error('No captions available for this video.');
   return result;
 }
 
-// Fetch runs inside the YouTube tab so it carries the page's cookies and
-// origin — fetching from the extension popup context returns an empty body.
-// Uses fmt=json3 which YouTube requires for non-empty responses.
-async function fetchTranscript(tabId, baseUrl) {
-  const url = new URL(baseUrl);
-  url.searchParams.set('fmt', 'json3');
-  const fetchUrl = url.toString();
-  console.log('[lexplore] fetchTranscript url:', fetchUrl);
-
+// Opens YouTube's built-in transcript panel and reads text from rendered DOM nodes.
+// No HTTP requests — avoids all cookie/origin/format issues with the timedtext API.
+async function loadTranscriptFromDOM(tabId) {
   let results;
   try {
     results = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      func: async (u) => {
-        try {
-          const res = await fetch(u);
-          console.log('[lexplore-page] status:', res.status);
-          if (!res.ok) return { _error: `HTTP ${res.status}` };
-          const text = await res.text();
-          console.log('[lexplore-page] body length:', text.length, '| first 200:', text.slice(0, 200));
-          return { text };
-        } catch (err) {
-          return { _error: err.message };
+      func: async () => {
+        const PANEL_SELECTOR =
+          'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
+        const SEGMENT_SELECTOR = 'ytd-transcript-segment-renderer';
+
+        // Click "Show transcript" button if panel isn't open yet.
+        const isVisible = el => {
+          if (!el) return false;
+          const s = el.getAttribute('visibility');
+          return s === 'ENGAGEMENT_PANEL_VISIBILITY_EXPANDED';
+        };
+
+        let panel = document.querySelector(PANEL_SELECTOR);
+        if (!isVisible(panel)) {
+          // Find the "..." menu button on the video and open it
+          const moreBtn = document.querySelector(
+            'ytd-menu-renderer yt-icon-button[aria-label], ' +
+            'ytd-video-primary-info-renderer ytd-menu-renderer button'
+          );
+          if (moreBtn) {
+            moreBtn.click();
+            await new Promise(r => setTimeout(r, 400));
+
+            // Click "Show transcript" in the overflow menu
+            const items = document.querySelectorAll('ytd-menu-service-item-renderer, yt-formatted-string');
+            for (const item of items) {
+              if (item.textContent.trim().toLowerCase().includes('transcript')) {
+                item.click();
+                break;
+              }
+            }
+            await new Promise(r => setTimeout(r, 800));
+          }
+          panel = document.querySelector(PANEL_SELECTOR);
         }
+
+        // Wait up to 3 s for segments to render
+        let segments = [];
+        for (let i = 0; i < 15; i++) {
+          segments = Array.from(document.querySelectorAll(SEGMENT_SELECTOR));
+          if (segments.length > 0) break;
+          await new Promise(r => setTimeout(r, 200));
+        }
+
+        if (!segments.length) {
+          return { _error: 'No transcript segments found. Enable captions on the video first.' };
+        }
+
+        const text = segments
+          .map(seg => {
+            const el = seg.querySelector('.segment-text, yt-formatted-string');
+            return el ? el.textContent.trim() : '';
+          })
+          .filter(Boolean)
+          .join(' ');
+
+        return { text };
       },
-      args: [fetchUrl],
     });
   } catch (err) {
     throw new Error(`Script injection failed: ${err.message}`);
   }
 
   const result = results?.[0]?.result;
-  console.log('[lexplore] result length:', result?.text?.length);
-  if (!result) throw new Error('No result from transcript fetch.');
-  if (result._error) throw new Error(`Failed to fetch transcript: ${result._error}`);
-
-  const transcript = parseTranscriptJson3(result.text);
-  console.log('[lexplore] parsed length:', transcript.length, '| first 200:', transcript.slice(0, 200));
-  return transcript;
-}
-
-function parseTranscriptJson3(text) {
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    console.warn('[lexplore] JSON parse failed, falling back to XML');
-    return parseTranscriptXml(text);
-  }
-  const texts = [];
-  for (const event of data.events || []) {
-    if (!event.segs) continue;
-    const line = event.segs
-      .map(s => s.utf8 || '')
-      .join('')
-      .replace(/\n/g, ' ')
-      .trim();
-    if (line) texts.push(line);
-  }
-  return texts.join(' ');
-}
-
-function parseTranscriptXml(xml) {
-  const texts = [];
-  const re = /<text[^>]*>([\s\S]*?)<\/text>/g;
-  let match;
-  while ((match = re.exec(xml)) !== null) {
-    const text = match[1]
-      .replace(/&amp;/g, '&')
-      .replace(/&#39;/g, "'")
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .trim();
-    if (text) texts.push(text);
-  }
-  return texts.join(' ');
+  if (!result) throw new Error('No result from transcript DOM read.');
+  if (result._error) throw new Error(result._error);
+  return result.text;
 }
 
 async function sendToLexplore({ title, content, sourceUrl }) {
@@ -163,31 +173,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Step 1: detect available transcript languages
-  let langData;
+  let pageData;
   try {
-    langData = await getLanguages(tab.id);
+    pageData = await getPageData(tab.id);
   } catch (err) {
-    console.error('[lexplore] getLanguages error:', err);
     showError(err.message);
     return;
   }
-  console.log('[lexplore] langData:', langData);
 
-  const { title, url, tracks } = langData;
-  const select = $('lang-select');
-  tracks.forEach(track => {
-    const option = document.createElement('option');
-    option.value = track.baseUrl;
-    option.textContent = track.languageName;
-    if (track.languageCode === 'en') option.selected = true;
-    select.appendChild(option);
-  });
+  const { title, author, url, language } = pageData;
+  $('title-input').value = title;
+  $('author-display').textContent = author || '—';
+  $('lang-display').textContent = language || 'unknown';
   showState('main');
 
   let currentTranscript = null;
 
-  // Step 2: load transcript for selected language (re-runnable on language change)
   async function loadTranscript() {
     const btn = $('load-btn');
     btn.disabled = true;
@@ -195,16 +196,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('transcript-section').classList.add('hidden');
 
     try {
-      currentTranscript = await fetchTranscript(tab.id, select.value);
+      currentTranscript = await loadTranscriptFromDOM(tab.id);
     } catch (err) {
       showError(err.message);
-      return;
-    } finally {
       btn.disabled = false;
-      btn.textContent = 'Load';
+      btn.textContent = 'Load transcript';
+      return;
     }
 
-    $('title-input').value = title;
+    btn.disabled = false;
+    btn.textContent = 'Load transcript';
     $('preview').value =
       currentTranscript.slice(0, 400) + (currentTranscript.length > 400 ? '…' : '');
     $('transcript-section').classList.remove('hidden');
@@ -212,7 +213,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('load-btn').addEventListener('click', loadTranscript);
 
-  // Step 3: send to Lexplore
   $('send-btn').addEventListener('click', async () => {
     const btn = $('send-btn');
     btn.disabled = true;

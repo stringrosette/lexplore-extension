@@ -48,39 +48,65 @@ async function getLanguages(tabId) {
 
 // Fetch runs inside the YouTube tab so it carries the page's cookies and
 // origin — fetching from the extension popup context returns an empty body.
+// Uses fmt=json3 which YouTube requires for non-empty responses.
 async function fetchTranscript(tabId, baseUrl) {
-  console.log('[lexplore] fetchTranscript url:', baseUrl);
+  const url = new URL(baseUrl);
+  url.searchParams.set('fmt', 'json3');
+  const fetchUrl = url.toString();
+  console.log('[lexplore] fetchTranscript url:', fetchUrl);
+
   let results;
   try {
     results = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      func: async (url) => {
+      func: async (u) => {
         try {
-          const res = await fetch(url);
-          console.log('[lexplore-page] fetch status:', res.status);
+          const res = await fetch(u);
+          console.log('[lexplore-page] status:', res.status);
           if (!res.ok) return { _error: `HTTP ${res.status}` };
-          const xml = await res.text();
-          console.log('[lexplore-page] xml length:', xml.length);
-          return { xml };
+          const text = await res.text();
+          console.log('[lexplore-page] body length:', text.length, '| first 200:', text.slice(0, 200));
+          return { text };
         } catch (err) {
           return { _error: err.message };
         }
       },
-      args: [baseUrl],
+      args: [fetchUrl],
     });
   } catch (err) {
     throw new Error(`Script injection failed: ${err.message}`);
   }
 
   const result = results?.[0]?.result;
-  console.log('[lexplore] fetchTranscript result:', result);
+  console.log('[lexplore] result length:', result?.text?.length);
   if (!result) throw new Error('No result from transcript fetch.');
   if (result._error) throw new Error(`Failed to fetch transcript: ${result._error}`);
 
-  const transcript = parseTranscriptXml(result.xml);
-  console.log('[lexplore] parsed transcript length:', transcript.length, '| first 200 chars:', transcript.slice(0, 200));
+  const transcript = parseTranscriptJson3(result.text);
+  console.log('[lexplore] parsed length:', transcript.length, '| first 200:', transcript.slice(0, 200));
   return transcript;
+}
+
+function parseTranscriptJson3(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.warn('[lexplore] JSON parse failed, falling back to XML');
+    return parseTranscriptXml(text);
+  }
+  const texts = [];
+  for (const event of data.events || []) {
+    if (!event.segs) continue;
+    const line = event.segs
+      .map(s => s.utf8 || '')
+      .join('')
+      .replace(/\n/g, ' ')
+      .trim();
+    if (line) texts.push(line);
+  }
+  return texts.join(' ');
 }
 
 function parseTranscriptXml(xml) {

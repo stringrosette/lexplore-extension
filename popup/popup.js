@@ -46,20 +46,39 @@ async function getLanguages(tabId) {
   return result;
 }
 
-async function fetchTranscript(baseUrl) {
+// Fetch runs inside the YouTube tab so it carries the page's cookies and
+// origin — fetching from the extension popup context returns an empty body.
+async function fetchTranscript(tabId, baseUrl) {
   console.log('[lexplore] fetchTranscript url:', baseUrl);
-  let res;
+  let results;
   try {
-    res = await fetch(baseUrl);
+    results = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: async (url) => {
+        try {
+          const res = await fetch(url);
+          console.log('[lexplore-page] fetch status:', res.status);
+          if (!res.ok) return { _error: `HTTP ${res.status}` };
+          const xml = await res.text();
+          console.log('[lexplore-page] xml length:', xml.length);
+          return { xml };
+        } catch (err) {
+          return { _error: err.message };
+        }
+      },
+      args: [baseUrl],
+    });
   } catch (err) {
-    console.error('[lexplore] fetch network error:', err);
-    throw new Error(`Network error fetching transcript: ${err.message}`);
+    throw new Error(`Script injection failed: ${err.message}`);
   }
-  console.log('[lexplore] fetch response status:', res.status, res.statusText);
-  if (!res.ok) throw new Error(`Failed to fetch transcript (${res.status})`);
-  const xml = await res.text();
-  console.log('[lexplore] xml length:', xml.length, '| first 200 chars:', xml.slice(0, 200));
-  const transcript = parseTranscriptXml(xml);
+
+  const result = results?.[0]?.result;
+  console.log('[lexplore] fetchTranscript result:', result);
+  if (!result) throw new Error('No result from transcript fetch.');
+  if (result._error) throw new Error(`Failed to fetch transcript: ${result._error}`);
+
+  const transcript = parseTranscriptXml(result.xml);
   console.log('[lexplore] parsed transcript length:', transcript.length, '| first 200 chars:', transcript.slice(0, 200));
   return transcript;
 }
@@ -150,7 +169,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('transcript-section').classList.add('hidden');
 
     try {
-      currentTranscript = await fetchTranscript(select.value);
+      currentTranscript = await fetchTranscript(tab.id, select.value);
     } catch (err) {
       showError(err.message);
       return;

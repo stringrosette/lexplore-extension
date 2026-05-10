@@ -105,6 +105,8 @@ async function sendToLexplore({ title, content, sourceUrl }) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  $('version').textContent = `v${chrome.runtime.getManifest().version}`;
+
   $('settings-link').addEventListener('click', e => {
     e.preventDefault();
     chrome.runtime.openOptionsPage();

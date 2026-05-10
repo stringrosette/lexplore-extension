@@ -26,6 +26,13 @@ h1 {
   letter-spacing: 0.02em;
 }
 
+#version {
+  font-size: 11px;
+  font-weight: 400;
+  color: #999;
+  letter-spacing: 0;
+}
+
 #settings-link {
   color: #999;
   text-decoration: none;

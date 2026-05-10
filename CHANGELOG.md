@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-10
+
+### Added
+- Transcript content now includes timestamps: each segment formatted as `[M:SS] text` on its own line
+
+### Fixed
+- `sendToLexplore` was sending `source_url` instead of `url` (API field name mismatch)
+- `language` and `text_type: 'script'` now passed to the API
+
+### Changed
+- Preview shows first 8 timestamped lines instead of a raw 400-character slice
+
 ## [0.4.0] - 2026-05-10
 
 ### Added

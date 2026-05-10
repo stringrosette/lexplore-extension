@@ -1,6 +1,6 @@
 # Lexplore Extension
 
-**Version:** 0.4.0
+**Version:** 0.5.0
 **Last Updated:** 2026-05-10
 
 Browser extension (Manifest V3) that extracts YouTube transcripts and sends them to the Lexplore API as texts.

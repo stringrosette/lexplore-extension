@@ -102,6 +102,26 @@ button:disabled {
   cursor: not-allowed;
 }
 
+select {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+select:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.muted {
+  color: #888;
+}
+
 .error-msg {
   color: #dc2626;
   line-height: 1.4;

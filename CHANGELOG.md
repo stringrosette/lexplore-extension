@@ -82,5 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Background service worker for API communication and auth
 - Settings page for API URL and token configuration
 
-[Unreleased]: https://github.com/username/lexplore-extension/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/username/lexplore-extension/releases/tag/v0.1.0
+[Unreleased]: https://github.com/stringrosette/lexplore-extension/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/stringrosette/lexplore-extension/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/stringrosette/lexplore-extension/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/stringrosette/lexplore-extension/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/stringrosette/lexplore-extension/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/stringrosette/lexplore-extension/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/stringrosette/lexplore-extension/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/stringrosette/lexplore-extension/releases/tag/v0.1.0

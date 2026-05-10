@@ -75,14 +75,13 @@ async function sendToLexplore({ title, content, sourceUrl }) {
     apiUrl: 'http://localhost:8000',
     token: '',
   });
-  if (!token) throw new Error('No API token configured. Open Settings to add one.');
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${apiUrl}/api/v1/texts`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify({ title, content, source_url: sourceUrl }),
   });
 

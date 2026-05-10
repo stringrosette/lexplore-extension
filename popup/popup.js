@@ -23,12 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Step 1: detect available transcript languages
-  const langResult = await chrome.runtime.sendMessage({
-    type: 'GET_LANGUAGES',
-    tabId: tab.id,
-  });
+  const langResult = await chrome.runtime.sendMessage({ type: 'GET_LANGUAGES' });
 
-  if (langResult?.error) { showError(langResult.error); return; }
+  if (!langResult) {
+    showError('No response from extension background. Close and reopen the popup.');
+    return;
+  }
+  if (langResult.error) { showError(langResult.error); return; }
 
   const { title, url, tracks } = langResult;
   const select = $('lang-select');

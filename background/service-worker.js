@@ -2,7 +2,7 @@
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_LANGUAGES') {
-    getLanguages(message.tabId)
+    getLanguages()
       .then(sendResponse)
       .catch(err => sendResponse({ error: err.message }));
     return true;
@@ -35,29 +35,40 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 // Reads ytInitialPlayerResponse directly from the page's JS context via
 // executeScript (world: MAIN), which bypasses YouTube's CSP restrictions.
-async function getLanguages(tabId) {
-  const results = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: 'MAIN',
-    func: () => {
-      const response = window.ytInitialPlayerResponse;
-      if (!response) return null;
-      const tracks =
-        response?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-      return {
-        title: document.title.replace(' - YouTube', '').trim(),
-        url: window.location.href,
-        tracks: tracks.map(t => ({
-          languageCode: t.languageCode,
-          languageName: t.name?.simpleText || t.languageCode,
-          baseUrl: t.baseUrl,
-        })),
-      };
-    },
-  });
+// Gets the active tab itself rather than trusting a tabId from the popup,
+// which avoids issues when the service worker wakes from sleep.
+async function getLanguages() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab) throw new Error('No active tab found.');
 
-  const result = results[0]?.result;
-  if (!result) throw new Error('Could not read page data. Try refreshing the YouTube tab.');
+  let results;
+  try {
+    results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: 'MAIN',
+      func: () => {
+        const response = window.ytInitialPlayerResponse;
+        if (!response) return { _error: 'ytInitialPlayerResponse not found — try refreshing the YouTube tab.' };
+        const tracks =
+          response?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+        return {
+          title: document.title.replace(' - YouTube', '').trim(),
+          url: window.location.href,
+          tracks: tracks.map(t => ({
+            languageCode: t.languageCode,
+            languageName: t.name?.simpleText || t.languageCode,
+            baseUrl: t.baseUrl,
+          })),
+        };
+      },
+    });
+  } catch (err) {
+    throw new Error(`Could not inject script: ${err.message}`);
+  }
+
+  const result = results?.[0]?.result;
+  if (!result) throw new Error('No result from page script. Try refreshing the YouTube tab.');
+  if (result._error) throw new Error(result._error);
   if (!result.tracks.length) throw new Error('No captions available for this video.');
   return result;
 }

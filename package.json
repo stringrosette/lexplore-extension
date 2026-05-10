@@ -1,0 +1,12 @@
+{
+  "name": "lexplore-extension",
+  "version": "0.1.0",
+  "description": "Browser extension for sending YouTube transcripts to the Lexplore API",
+  "scripts": {
+    "lint": "web-ext lint --source-dir ."
+  },
+  "devDependencies": {
+    "web-ext": "^8.0.0"
+  },
+  "license": "MIT"
+}

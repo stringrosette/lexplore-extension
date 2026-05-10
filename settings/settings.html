@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lexplore — Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <h1>Lexplore Settings</h1>
+
+  <form id="settings-form">
+    <label for="api-url">API URL</label>
+    <input type="url" id="api-url" placeholder="http://localhost:8000" />
+
+    <label for="token">Bearer Token</label>
+    <input type="password" id="token" placeholder="Paste your JWT token here" />
+
+    <button type="submit">Save</button>
+    <span id="saved-msg" class="hidden">✓ Saved</span>
+  </form>
+
+  <script src="settings.js"></script>
+</body>
+</html>

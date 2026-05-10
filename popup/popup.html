@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lexplore</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>Lexplore</h1>
+    <a href="#" id="settings-link" title="Settings">⚙</a>
+  </header>
+
+  <main>
+    <div id="state-loading" class="state">
+      <p>Extracting transcript…</p>
+    </div>
+
+    <div id="state-error" class="state hidden">
+      <p class="error-msg"></p>
+    </div>
+
+    <div id="state-ready" class="state hidden">
+      <label for="title-input">Title</label>
+      <input type="text" id="title-input" />
+
+      <label for="preview">Transcript preview</label>
+      <textarea id="preview" readonly rows="6"></textarea>
+
+      <button id="send-btn">Send to Lexplore</button>
+    </div>
+
+    <div id="state-success" class="state hidden">
+      <p class="success-msg">✓ Sent to Lexplore</p>
+    </div>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

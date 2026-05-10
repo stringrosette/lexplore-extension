@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Lexplore",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Send YouTube transcripts to your Lexplore library",
 
   "permissions": [
     "storage",
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "webRequest"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",

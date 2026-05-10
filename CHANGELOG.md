@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-10
+
+### Added
+- `webRequest` listener in service worker intercepts YouTube's timedtext API requests and stores the URL (with auth tokens) per tab in `chrome.storage.session`
+
+### Changed
+- Transcript loading now replays the captured timedtext URL via `executeScript` fetch in the YouTube tab — no DOM click simulation
+- Service worker reduced to a single `webRequest.onBeforeRequest` listener; all dead message handlers removed
+- `parseTranscript()` tries JSON3 format first, falls back to XML
+
+### Removed
+- `loadTranscriptFromDOM()` and all DOM click simulation logic removed
+
 ## [0.3.1] - 2026-05-10
 
 ### Fixed

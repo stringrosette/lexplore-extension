@@ -27,7 +27,6 @@ async function getPageData(tabId) {
         const details = response.videoDetails || {};
         const title = details.title || document.title.replace(' - YouTube', '').trim();
         const author = details.author || '';
-        const videoId = details.videoId || '';
         const url = window.location.href;
 
         let language = null;
@@ -39,14 +38,13 @@ async function getPageData(tabId) {
           }
         } catch (_) {}
 
-        // Fall back to first available caption track language
         if (!language) {
           const tracks =
             response?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
           if (tracks.length) language = tracks[0].languageCode;
         }
 
-        return { title, author, videoId, url, language };
+        return { title, author, url, language };
       },
     });
   } catch (err) {
@@ -59,127 +57,77 @@ async function getPageData(tabId) {
   return result;
 }
 
-// Opens YouTube's built-in transcript panel and reads text from rendered DOM nodes.
-// No HTTP requests — avoids all cookie/origin/format issues with the timedtext API.
-async function loadTranscriptFromDOM(tabId) {
+// Replays the timedtext URL that was captured by the service worker's webRequest
+// listener. Runs the fetch inside the YouTube tab so it carries the page's
+// cookies and origin — fetching from the popup context returns an empty body.
+async function fetchTranscriptFromUrl(tabId, url) {
+  console.log('[lexplore] replaying captured url:', url.slice(0, 120));
+
   let results;
   try {
     results = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      func: async () => {
-        const log = (...args) => console.log('[lexplore]', ...args);
-
-        const PANEL_SELECTOR =
-          'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
-        const SEGMENT_SELECTOR = 'ytd-transcript-segment-renderer';
-
-        // 1. Check if transcript segments are already rendered
-        let segments = Array.from(document.querySelectorAll(SEGMENT_SELECTOR));
-        log('initial segment count:', segments.length);
-
-        if (!segments.length) {
-          const panel = document.querySelector(PANEL_SELECTOR);
-          log('panel found:', !!panel, '| visibility:', panel?.getAttribute('visibility'));
-
-          // 2. Find the overflow "⋮" button in the video info area.
-          //    Selectors tried in priority order — YouTube layout varies by experiment.
-          //    We never use a broad selector that could match like/dislike buttons.
-          const overflowSelectors = [
-            'ytd-video-primary-info-renderer ytd-menu-renderer yt-icon-button button',
-            'ytd-watch-metadata ytd-menu-renderer yt-icon-button button',
-            '#above-the-fold ytd-menu-renderer yt-icon-button button',
-          ];
-
-          let overflowBtn = null;
-          for (const sel of overflowSelectors) {
-            const el = document.querySelector(sel);
-            log(`selector "${sel}":`, !!el);
-            if (el) { overflowBtn = el; break; }
-          }
-
-          if (!overflowBtn) {
-            log('overflow button not found');
-            return {
-              _error:
-                'Could not find the More Actions (⋮) button. ' +
-                'Open the transcript panel in YouTube manually (⋮ → Show transcript), then click Load again.',
-            };
-          }
-
-          log('clicking overflow button');
-          overflowBtn.click();
-          await new Promise(r => setTimeout(r, 500));
-
-          // 3. Find "Show transcript" in the dropdown
-          const menuItems = document.querySelectorAll(
-            'ytd-menu-popup-renderer ytd-menu-service-item-renderer, ' +
-            'tp-yt-iron-dropdown ytd-menu-service-item-renderer'
-          );
-          log('dropdown items found:', menuItems.length);
-
-          let transcriptItem = null;
-          for (const item of menuItems) {
-            const text = item.textContent.trim();
-            log('  menu item:', JSON.stringify(text));
-            if (text.toLowerCase().includes('transcript')) {
-              transcriptItem = item;
-              break;
-            }
-          }
-
-          if (!transcriptItem) {
-            log('transcript option not in menu — closing dropdown');
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-            return {
-              _error:
-                'Show transcript option not found in the menu. ' +
-                'Make sure captions are available for this video.',
-            };
-          }
-
-          log('clicking transcript menu item');
-          transcriptItem.click();
-          await new Promise(r => setTimeout(r, 1000));
+      func: async (u) => {
+        const log = (...a) => console.log('[lexplore-page]', ...a);
+        try {
+          const res = await fetch(u);
+          log('status:', res.status);
+          if (!res.ok) return { _error: `HTTP ${res.status}` };
+          const text = await res.text();
+          log('length:', text.length, '| preview:', text.slice(0, 120));
+          return { text };
+        } catch (err) {
+          return { _error: err.message };
         }
-
-        // 4. Poll for segments (up to 4 s)
-        for (let i = 0; i < 20; i++) {
-          segments = Array.from(document.querySelectorAll(SEGMENT_SELECTOR));
-          log(`poll ${i + 1}: segments =`, segments.length);
-          if (segments.length) break;
-          await new Promise(r => setTimeout(r, 200));
-        }
-
-        if (!segments.length) {
-          return {
-            _error:
-              'Transcript panel opened but no segments rendered. ' +
-              'Try scrolling the panel or refreshing the page.',
-          };
-        }
-
-        const text = segments
-          .map(seg => {
-            const el = seg.querySelector('.segment-text, yt-formatted-string');
-            return el ? el.textContent.trim() : '';
-          })
-          .filter(Boolean)
-          .join(' ');
-
-        log('transcript chars:', text.length, '| preview:', text.slice(0, 80));
-        return { text };
       },
+      args: [url],
     });
   } catch (err) {
     throw new Error(`Script injection failed: ${err.message}`);
   }
 
   const result = results?.[0]?.result;
-  console.log('[lexplore] DOM result:', result?._error ?? `${result?.text?.length} chars`);
-  if (!result) throw new Error('No result from transcript DOM read.');
-  if (result._error) throw new Error(result._error);
-  return result.text;
+  console.log('[lexplore] fetch result:', result?._error ?? `${result?.text?.length} chars`);
+  if (!result) throw new Error('No result from transcript fetch.');
+  if (result._error) throw new Error(`Failed to fetch transcript: ${result._error}`);
+  return parseTranscript(result.text);
+}
+
+function parseTranscript(text) {
+  try {
+    const data = JSON.parse(text);
+    const lines = [];
+    for (const event of data.events || []) {
+      if (!event.segs) continue;
+      const line = event.segs.map(s => s.utf8 || '').join('').replace(/\n/g, ' ').trim();
+      if (line) lines.push(line);
+    }
+    if (lines.length) {
+      console.log('[lexplore] parsed as JSON3, segments:', lines.length);
+      return lines.join(' ');
+    }
+  } catch {}
+  console.log('[lexplore] falling back to XML parser');
+  return parseTranscriptXml(text);
+}
+
+function parseTranscriptXml(xml) {
+  const texts = [];
+  const re = /<text[^>]*>([\s\S]*?)<\/text>/g;
+  let match;
+  while ((match = re.exec(xml)) !== null) {
+    const decoded = match[1]
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .trim();
+    if (decoded) texts.push(decoded);
+  }
+  console.log('[lexplore] XML parsed, segments:', texts.length);
+  return texts.join(' ');
 }
 
 async function sendToLexplore({ title, content, sourceUrl }) {
@@ -242,7 +190,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('transcript-section').classList.add('hidden');
 
     try {
-      currentTranscript = await loadTranscriptFromDOM(tab.id);
+      const stored = await chrome.storage.session.get(`transcript_${tab.id}`);
+      const transcriptUrl = stored[`transcript_${tab.id}`];
+      console.log('[lexplore] stored url:', transcriptUrl ? transcriptUrl.slice(0, 80) : 'none');
+
+      if (!transcriptUrl) {
+        throw new Error(
+          'No transcript captured yet. Enable captions on the video, wait a moment, then try again.'
+        );
+      }
+
+      currentTranscript = await fetchTranscriptFromUrl(tab.id, transcriptUrl);
     } catch (err) {
       showError(err.message);
       btn.disabled = false;

@@ -168,7 +168,7 @@ async function sendToLexplore({ title, content, url, language }) {
 async function googleLogin() {
   const { apiUrl, firebaseApiKey, googleClientId } = await chrome.storage.local.get({
     apiUrl: 'http://localhost:8000',
-    firebaseApiKey: '',
+    firebaseApiKey: 'AIzaSyAJZoUaHOeUam6rGosVDF3Q0lsZJTYrAL0',
     googleClientId: '',
   });
 

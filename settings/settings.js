@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const { apiUrl, token, firebaseApiKey, googleClientId } = await chrome.storage.local.get({
     apiUrl: 'http://localhost:8000',
     token: '',
-    firebaseApiKey: '',
+    firebaseApiKey: 'AIzaSyAJZoUaHOeUam6rGosVDF3Q0lsZJTYrAL0',
     googleClientId: '',
   });
 

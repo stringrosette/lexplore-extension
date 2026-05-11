@@ -165,6 +165,79 @@ async function sendToLexplore({ title, content, url, language }) {
   return res.json();
 }
 
+async function googleLogin() {
+  const { apiUrl, firebaseApiKey, googleClientId } = await chrome.storage.local.get({
+    apiUrl: 'http://localhost:8000',
+    firebaseApiKey: '',
+    googleClientId: '',
+  });
+
+  if (!firebaseApiKey || !googleClientId) {
+    throw new Error('Configure Firebase API key and Google client ID in Settings first.');
+  }
+
+  // Step 1: get Google access token via OAuth popup
+  const redirectUrl = chrome.identity.getRedirectURL();
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/auth');
+  authUrl.searchParams.set('client_id', googleClientId);
+  authUrl.searchParams.set('response_type', 'token');
+  authUrl.searchParams.set('redirect_uri', redirectUrl);
+  authUrl.searchParams.set('scope', 'openid email profile');
+
+  const responseUrl = await new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow(
+      { url: authUrl.toString(), interactive: true },
+      url => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(url);
+      }
+    );
+  });
+
+  const params = new URLSearchParams(new URL(responseUrl).hash.slice(1));
+  const accessToken = params.get('access_token');
+  if (!accessToken) throw new Error('No access token returned from Google.');
+
+  // Step 2: exchange Google access token for Firebase ID token
+  const fbRes = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${firebaseApiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        postBody: `access_token=${accessToken}&providerId=google.com`,
+        requestUri: 'http://localhost',
+        returnIdpCredential: true,
+        returnSecureToken: true,
+      }),
+    }
+  );
+
+  if (!fbRes.ok) {
+    const err = await fbRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Firebase error ${fbRes.status}`);
+  }
+
+  const fbData = await fbRes.json();
+
+  // Step 3: exchange Firebase ID token for Lexplore access token
+  const res = await fetch(`${apiUrl}/api/v1/auth/firebase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id_token: fbData.idToken }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Server error ${res.status}`);
+  }
+
+  const data = await res.json();
+  await chrome.storage.local.set({ token: data.access_token, userEmail: fbData.email });
+  $('account-btn').classList.add('logged-in');
+  showState('main');
+}
+
 async function showLoginState() {
   const { token, userEmail } = await chrome.storage.local.get({ token: '', userEmail: '' });
   if (token) {
@@ -232,6 +305,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     } finally {
       btn.disabled = false;
       btn.textContent = 'Sign in';
+    }
+  });
+
+  // Google login
+  $('google-login-btn').addEventListener('click', async () => {
+    const btn = $('google-login-btn');
+    const errorEl = $('login-error');
+    errorEl.classList.add('hidden');
+    btn.disabled = true;
+
+    try {
+      await googleLogin();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
     }
   });
 

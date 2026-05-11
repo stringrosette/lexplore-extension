@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-11
+
+### Added
+- Google Sign-In in popup login form using `chrome.identity.launchWebAuthFlow` → Firebase Identity Toolkit REST API → `/api/v1/auth/firebase`
+- Settings page: Firebase API Key and Google OAuth Web Client ID fields; shows the extension's redirect URL to copy into Google Cloud Console
+- `identity` permission added to manifest
+
 ## [0.6.0] - 2026-05-10
 
 ### Added

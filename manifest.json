@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lexplore",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Send YouTube transcripts to your Lexplore library",
 
   "permissions": [
@@ -9,7 +9,8 @@
     "activeTab",
     "scripting",
     "tabs",
-    "webRequest"
+    "webRequest",
+    "identity"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",

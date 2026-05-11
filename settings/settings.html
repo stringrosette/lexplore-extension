@@ -14,7 +14,31 @@
     <input type="url" id="api-url" placeholder="http://localhost:8000" />
 
     <label for="token">Bearer Token</label>
-    <input type="password" id="token" placeholder="Paste your JWT token here" />
+    <input type="password" id="token" placeholder="Set automatically when you sign in" />
+
+    <h2>Google Sign-In</h2>
+    <p class="hint">
+      Required for "Sign in with Google" in the popup.<br>
+      Find these in <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a>
+      → Authentication → Sign-in method → Google → Web SDK configuration.
+    </p>
+
+    <label for="firebase-api-key">Firebase API Key</label>
+    <input type="text" id="firebase-api-key" placeholder="AIza..." />
+
+    <label for="google-client-id">Google OAuth Web Client ID</label>
+    <input type="text" id="google-client-id" placeholder="123456789-abc.apps.googleusercontent.com" />
+
+    <label>Extension Redirect URL</label>
+    <div class="copy-row">
+      <input type="text" id="redirect-url" readonly />
+      <button type="button" id="copy-btn">Copy</button>
+    </div>
+    <p class="hint">
+      Add this URL to your Google OAuth client's
+      <strong>Authorized redirect URIs</strong> in
+      <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a>.
+    </p>
 
     <button type="submit">Save</button>
     <span id="saved-msg" class="hidden">✓ Saved</span>
